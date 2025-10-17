@@ -540,7 +540,7 @@
                     <div class="font-medium text-slate-900">Change password</div>
                     <div class="text-sm text-slate-500">Update your password regularly.</div>
                   </div>
-                  <button class="btn hover:bg-slate-50">Update</button>
+                  <button id="btn-change-password" class="btn hover:bg-slate-50">Update</button><!-- connect to a handlePasswordReset() function -->
                 </div>
               </div>
             </div>
@@ -768,7 +768,7 @@
     setKycState(kycDone);
     let profileComplete = computeProfileComplete(row);
 
-    // ---------- KYC button handler ----------
+    // ---------- KYC button handler my lort.. ----------
     const btnKycStart = document.getElementById("btn-kyc-start");
     btnKycStart?.addEventListener("click", () => {
       openKycModal();
@@ -787,11 +787,43 @@
         modal.classList.add("hidden");
       }
     }
+    
+async function handlePasswordReset() {
+  const btn = document.getElementById('btn-change-password');
+  if (!user?.email) {
+    alert('Unable to determine your email address.');
+    return;
+  }
+
+  try {
+   
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${location.origin}/reset.html`
+    });
+    
+    if (error) throw error;
+    
+    banner('Password reset link sent to your email!', 'ok');
+  } catch (err) {
+    console.error('Password reset error:', err);
+    banner(err.message || 'Failed to send reset link.', 'error');
+  } finally {
+    // Re-enable button
+    btn.disabled = false;
+    btn.textContent = 'Update';
+  }
+}
+
+// Attach event listener to change password button
+document.getElementById('btn-change-password')?.addEventListener('click', handlePasswordReset);
 
     // Listen for KYC approval message from iframe
     window.addEventListener('message', async (event) => {
       if (event.data?.type === 'KYC_APPROVED') {
-        console.log('🎉 KYC Approved! Refreshing gates...');
+        console.log(' KYC Approved! Refreshing gates...');
         
         // Refresh user profile data from Supabase
         const { data: updatedProfile } = await supabase
