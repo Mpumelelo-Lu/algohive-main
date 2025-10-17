@@ -520,8 +520,81 @@
 
             <!-- AGREEMENTS -->
             <div id="agreements" data-panel="agreements" class="hidden card border border-slate-200 rounded-2xl p-6">
-              <h2 class="text-xl font-semibold text-slate-900">Agreements</h2>
-              <p class="mt-4 text-sm text-slate-500">Your signed agreements will show here.</p>
+              <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-slate-900">Agreements</h2>
+                <span id="agreements-status" class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-900">
+                  Review Required
+                </span>
+              </div>
+              <p class="mt-2 text-sm text-slate-500">
+                Review and accept the following agreements to unlock all AlgoHive features.
+              </p>
+      
+              <!-- for testing purposes-->
+              <!-- Agreement Items -->
+              <div class="mt-6 space-y-4">
+                <!-- Terms of Service -->
+                <div class="border border-slate-200 rounded-lg p-4">
+                  <div class="flex items-start gap-3">
+                    <input id="terms-checkbox" type="checkbox" class="mt-1 h-4 w-4 text-olive-600 rounded border-slate-300" />
+                    <div class="flex-1">
+                      <label for="terms-checkbox" class="text-sm font-medium text-slate-900 cursor-pointer">
+                        Terms of Service
+                      </label>
+                      <p class="text-xs text-slate-500 mt-1">
+                        By checking this box, I confirm that I have read, understood, and agree to AlgoHive's Terms of Service.
+                      </p>
+                      <a href="#" class="text-xs text-olive-600 hover:underline">View Terms of Service →</a>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Privacy Policy -->
+                <div class="border border-slate-200 rounded-lg p-4">
+                  <div class="flex items-start gap-3">
+                    <input id="privacy-checkbox" type="checkbox" class="mt-1 h-4 w-4 text-olive-600 rounded border-slate-300" />
+                    <div class="flex-1">
+                      <label for="privacy-checkbox" class="text-sm font-medium text-slate-900 cursor-pointer">
+                        Privacy Policy
+                      </label>
+                      <p class="text-xs text-slate-500 mt-1">
+                        I acknowledge that I have read and understood AlgoHive's Privacy Policy regarding data collection and usage.
+                      </p>
+                      <a href="#" class="text-xs text-olive-600 hover:underline">View Privacy Policy →</a>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Investment Risk Disclosure Which We can Change later -->
+                <div class="border border-slate-200 rounded-lg p-4">
+                  <div class="flex items-start gap-3">
+                    <input id="risk-checkbox" type="checkbox" class="mt-1 h-4 w-4 text-olive-600 rounded border-slate-300" />
+                    <div class="flex-1">
+                      <label for="risk-checkbox" class="text-sm font-medium text-slate-900 cursor-pointer">
+                        Investment Risk Disclosure
+                      </label>
+                      <p class="text-xs text-slate-500 mt-1">
+                        I understand the risks associated with investment strategies and acknowledge all investment disclaimers.
+                      </p>
+                      <a href="#" class="text-xs text-olive-600 hover:underline">View Risk Disclosure →</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="mt-8 flex items-center gap-4">
+                <button id="accept-agreements" class="btn btn-olive" disabled>
+                  Accept All Agreements
+                </button>
+                <span id="agreements-saved" class="hidden text-sm text-emerald-700">✅ Agreements Accepted</span>
+              </div>
+
+              <!-- Completion Message -->
+              <div id="agreements-complete" class="hidden mt-6 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 p-4">
+                <div class="font-medium">All agreements accepted! 🎉</div>
+                <div class="text-sm mt-1">You now have full access to all AlgoHive features.</div>
+              </div>
             </div>
 
             <!-- SECURITY -->
@@ -767,6 +840,9 @@
     let kycDone = resolveKycBoolean(row);
     setKycState(kycDone);
     let profileComplete = computeProfileComplete(row);
+    
+    // Load agreements status from profile
+    agreementsAccepted = !!row?.agreements_accepted;
 
     // ---------- KYC button handler from my other code----------
     const btnKycStart = document.getElementById("btn-kyc-start");
@@ -811,44 +887,73 @@
       }
     });
 
-    const allowedTabsWhenGated = new Set(["extra", "docs"]);
-    function isGated() { return !(profileComplete && kycDone); }
+    const allowedTabsWhenGated = new Set(["extra", "docs", "agreements"]);
+    let agreementsAccepted = false; // Will be loaded from profile data
+    
+    function isGated() { return !(profileComplete && kycDone && agreementsAccepted); }
     function gateReason() {
+      if (!profileComplete && !kycDone && !agreementsAccepted) return "Please complete Additional Info, KYC, and accept Agreements.";
       if (!profileComplete && !kycDone) return "Please finish Additional Info and complete KYC first.";
+      if (!profileComplete && !agreementsAccepted) return "Please finish Additional Info and accept Agreements.";
+      if (!kycDone && !agreementsAccepted) return "Please complete KYC and accept Agreements.";
       if (!profileComplete) return "Please finish Additional Info first.";
       if (!kycDone) return "Please complete KYC first.";
+      if (!agreementsAccepted) return "Please review and accept the Agreements to unlock all features.";
       return "";
     }
     function lockMainNav() {
       const mainNav = document.getElementById("main-nav");
       if (!mainNav) return;
-      function preventNav(e) { e.preventDefault(); banner(gateReason(), "warn"); location.hash = !profileComplete ? "#extra" : "#kyc"; }
+      function preventNav(e) { e.preventDefault(); banner(gateReason(), "warn"); location.hash = getNextRequiredStep(); }
       mainNav.querySelectorAll('a[href]').forEach(a => {
         const href = (a.getAttribute("href") || "").trim();
         const isSettings = href.startsWith("#") || /settings\.html/i.test(href) || href === "";
         if (isGated() && !isSettings) {
           a.classList.add("link-disabled"); a.setAttribute("aria-disabled", "true");
-          a.title = "Locked until profile + KYC are complete";
+          a.title = "Locked until profile, KYC, and agreements are complete";
           a.addEventListener("click", preventNav, { passive: false });
         } else {
           a.classList.remove("link-disabled"); a.removeAttribute("aria-disabled"); a.removeAttribute("title");
         }
       });
       mainNav.querySelectorAll('details > summary').forEach(sum => {
-        function onSumClick() { if (isGated()) setTimeout(() => { banner(gateReason(), "warn"); location.hash = !profileComplete ? "#extra" : "#kyc"; }, 0); }
+        function onSumClick() { 
+          if (isGated()) {
+            setTimeout(() => { 
+              banner(gateReason(), "warn"); 
+              location.hash = getNextRequiredStep(); 
+            }, 0); 
+          }
+        }
         sum.addEventListener("click", onSumClick);
       });
     }
+    
+    function getNextRequiredStep() {
+      if (!profileComplete) return "#extra";
+      if (!kycDone) return "#docs";
+      if (!agreementsAccepted) return "#agreements";
+      return "#basic";
+    }
+    
     function enforceSettingsGuard() {
       if (!isGated()) return;
       const hash = (location.hash || "#basic").toLowerCase();
       const wanted = hash.replace(/^#/, "");
       if (!allowedTabsWhenGated.has(wanted)) {
-        const target = !profileComplete ? "#extra" : "#kyc";
+        const target = getNextRequiredStep();
         if (hash !== target) { banner(gateReason(), "warn"); location.hash = target; }
       }
     }
-    function refreshGates() { lockMainNav(); enforceSettingsGuard(); }
+    function refreshGates() { 
+      // Update state from current profile data
+      if (profile) {
+        profileComplete = !!(profile.phone_number && profile.id_number && profile.dob);
+        agreementsAccepted = !!profile.agreements_accepted;
+      }
+      lockMainNav(); 
+      enforceSettingsGuard(); 
+    }
     lockMainNav(); enforceSettingsGuard(); window.addEventListener("hashchange", enforceSettingsGuard);
     const _origSetKycState = setKycState;
     setKycState = (isDone) => { _origSetKycState(isDone); kycDone = !!isDone; refreshGates(); };
@@ -1200,6 +1305,74 @@
         btn.disabled = false;
       }
     });
+
+    // ---------- Agreements Section ----------
+    const agreementCheckboxes = {
+      tos: document.getElementById('agreement-tos'),
+      privacy: document.getElementById('agreement-privacy'),
+      risk: document.getElementById('agreement-risk')
+    };
+    const acceptAgreementsBtn = document.getElementById('accept-agreements');
+
+    // Update accept button state based on checkbox states
+    function updateAcceptButtonState() {
+      const allChecked = Object.values(agreementCheckboxes).every(checkbox => checkbox?.checked);
+      if (acceptAgreementsBtn) {
+        acceptAgreementsBtn.disabled = !allChecked;
+      }
+    }
+
+    // Add event listeners to checkboxes
+    Object.values(agreementCheckboxes).forEach(checkbox => {
+      if (checkbox) {
+        checkbox.addEventListener('change', updateAcceptButtonState);
+      }
+    });
+
+    // Handle accept agreements
+    if (acceptAgreementsBtn) {
+      acceptAgreementsBtn.addEventListener('click', async () => {
+        try {
+          setBusy(acceptAgreementsBtn, true);
+
+          // Ensure all checkboxes are checked
+          const allChecked = Object.values(agreementCheckboxes).every(checkbox => checkbox?.checked);
+          if (!allChecked) {
+            banner('Please accept all agreements to continue', 'warn');
+            return;
+          }
+
+          // Update profile with agreements accepted
+          const { error } = await supabase
+            .from('profiles')
+            .update({ 
+              agreements_accepted: true,
+              agreements_accepted_at: new Date().toISOString()
+            })
+            .eq('id', user.id);
+
+          if (error) throw error;
+
+          banner('Agreements accepted successfully! Welcome to AlgoHive.', 'ok');
+          
+          // Update local state and refresh gates
+          if (profile) {
+            profile.agreements_accepted = true;
+          }
+          agreementsAccepted = true;
+          refreshGates();
+
+        } catch (e) {
+          console.error(e);
+          banner(e.message || 'Failed to accept agreements', 'err');
+        } finally {
+          setBusy(acceptAgreementsBtn, false);
+        }
+      });
+    }
+
+    // Initialize accept button state
+    updateAcceptButtonState();
   </script>
 
 
